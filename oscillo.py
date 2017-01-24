@@ -25,6 +25,10 @@ class RIGOLDS1052E(object):
         
     def get_idn(self):
         return self.instr.ask("*IDN?")
+
+    def get_curve(self):
+        """should take a curve"""
+        return [1,5,6]
         
 # Utilisation
 oscillo = RIGOLDS1052E()
