@@ -34,10 +34,10 @@ class Generator(object):
     def get_freq(self,channel):  
         if  str(channel) == '1':
         #Affiche la freq génerée sur Ch1
-         print("freq_CH1 =",self.instr.ask('FREQ?'))
+         print("freq_CH1 =",self.instr.ask_for_value('FREQ?'),'Hz')
         elif str(channel) == '2':
             #Affiche la freq génerée sur ch2
-             print("freq_CH2 =",self.instr.ask('FREQuency:CH2?'))
+             print('freq_CH2 =',self.ask_for_value('FREQuency:CH2?'),'Hz')
         else:
              print('check the channel')
              
@@ -62,7 +62,7 @@ class Generator(object):
             self.instr.write('APPLy:SINusoid'+' '+str(frequency)+','+str(amplitude)+','+str(offset))
         elif str(channel)=='2':
             #Generate a sine wave with specific frequency, amplitude and DC offset via CH2. 
-            self.instr.write(' APPLy:SINusoid:CH2'+' '+str(frequency)+','+str(amplitude)+','+str(offset))
+             self.instr.write(' APPLy:SINusoid:CH2'+' '+str(frequency)+','+str(amplitude)+','+str(offset))
         else:
              print('check the channel')
                   

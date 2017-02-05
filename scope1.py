@@ -69,21 +69,30 @@ class RigolDS1052E(object):
         
     def get_freq(self,channel):
          #Retourne la fréquence de la voie 'channel' 
-        print ("freq =" ,self.ask_for_value(':MEASure:FREQuency?'+' ' +':CHAN' + str(channel)),'Hz')
+        print ("freq =" ,self.ask_for_value(':MEASure:FREQuency?'+' ' +':CHANnel'+ str(channel)),'Hz')
  
     def get_ampl(self,channel):
-        print ( self.ask_for_value(':MEASure:VAMPlitude? [<source>]:MEASure:VAMPlitude?'+' '+'CHANnel' + str(channel)))
-        
+        if str(channel)=='1':
+            vpp=self.ask_for_value(':MEASure:VAMPlitude? CHANnel1')
+            amp = vpp/2
+            print ('Ampl = ',amp,'V')
+        elif str(channel)=='2':
+            vpp=self.ask_for_value(':MEASure:VAMPlitude? CHANnel2')
+            amp = vpp/2
+            print ('Ampl = ',amp,'V')
+        else:
+            print('check your Channel')
+            
     def get_volt(self,channel):
-        print ("Vmax =", self.ask_for_value(':MEASure:VMAX?' + ':CHAN' + str(channel)))
-        print ("Vmin =", self.ask_for_value(':MEASure:VMIN?' + ':CHAN' + str(channel)))
-        print ("Vpp =" , self.ask_for_value(':MEASure:VPP?'  + ':CHAN' + str(channel)))
-        print ("Vtop =", self.ask_for_value(':MEASure:VTOP?' + ':CHAN' + str(channel)))
-        print ("Vrms =", self.ask_for_value(':MEASure:VRMS?' + ':CHAN' + str(channel)))
-        print ("Vbas =", self.ask_for_value(':MEASure:VBASe?'+ ':CHAN' + str(channel)))
-        print ("Vmoy =", self.ask_for_value(':MEASure:VAVerage?' + ':CHAN' + str(channel)))
+        print ("Vmax =", self.ask_for_value(':MEASure:VMAX?'+' '+':CHAN' + str(channel)))
+        print ("Vmin =", self.ask_for_value(':MEASure:VMIN?'+' '+':CHAN' + str(channel)))
+        print ("Vpp =" , self.ask_for_value(':MEASure:VPP?'+' ' + ':CHAN' + str(channel)))
+        print ("Vtop =", self.ask_for_value(':MEASure:VTOP?'+' ' + ':CHAN' + str(channel)))
+        print ("Vrms =", self.ask_for_value(':MEASure:VRMS?'+' '+ ':CHAN' + str(channel)))
+        print ("Vbas =", self.ask_for_value(':MEASure:VBASe?'+' '+ ':CHAN' + str(channel)))
+        print ("Vmoy =", self.ask_for_value(':MEASure:VAVerage?'+' '+ ':CHAN' + str(channel)))
        
-        
+    
         
    
     #def get_params(self, channel):
