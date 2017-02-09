@@ -1,21 +1,16 @@
-#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Sat Feb  4 17:29:42 2017
+Created on Wed Feb 08 19:23:22 2017
 
-@author: Ali Beydoun et Massilia Hamdani
+@author: DUALCOMPUTER
 """
-from __future__ import division
+
 from matplotlib.pyplot import *
 import visa
 import numpy as np
 from pylab import *
 import time
 from decimal import *
-
-
-#from PyQt4 import QtCore
-
 
 class RigolDS1052E(object):
     """ 
@@ -84,10 +79,10 @@ class RigolDS1052E(object):
  
     def get_ampl(self,channel):
         if str(channel)=='1':
-            vpp=self.ask_for_value(':MEASure:VAMPlitude? CHANnel1')
+            vpp=self.ask_for_value(':MEAS:VAMP? CHAN1')
             return vpp/2        
         elif str(channel)=='2':
-            vpp=self.ask_for_value(':MEASure:VAMPlitude? CHANnel2')
+            vpp=self.ask_for_value(':MEAS:VAMP? CHAN2')
             return vpp/2
            
         else:
@@ -208,81 +203,42 @@ class Generator(object):
 
 class Transfert(object):
     
-    """créee des signaux sinusoidaux sur la voie 1 et 2 d'amplitude donnée , de fréquence variable et offeset nulle,
-            de phase nulle.
-            CH1 signal de Ref: signal d'entrée
-            CH2 signal en sortie du filtre
-        """
     def __init__(self):
         self.signal = Generator('USB0::0x1AB1::0x0588::DG1D120300068::INSTR')
         self.oscillo = RigolDS1052E('USB0::0x1AB1::0x0588::DS1ED122206267::INSTR')
         
-    def dephasage_gain(self,amp):
-        liste_phase = []
-        liste_gain = []
-        liste_A = []
-        liste_B = []
-        liste_freq = [10**i for i in np.linspace(2,6,20)]     
-        self.signal.set_sinus(1,10,amp,0)
-        time.sleep(0.2)
         
-            
+    def dephasage_gain(self,amp):
+        liste_gain = []
+        liste_phase = []
+        liste_freq = [10**i for i in np.linspace(2,5,20)]  
         
         for f in liste_freq:
-            #print(f)
             # signal de Ref signal d'entrée A(t) / Ch 1
             self.signal.set_sinus(1,f,amp,0)
             time.sleep(0.2)
-            # signal de sortie B(t) / Ch 2
-            #self.signal.set_sinus(2,f,amp,0)
-            #time.sleep(0.2)
             # changer la base de temps pour visualiser le signal àl'ecran
             #l'avantage c'est pouvoir acquérir plus de data sur N oscillations
             self.oscillo.set_timebase(1/f)
             #Set the initial phase = 0°
             self.signal.instr.write('PHASe 0')
-            #self.signal.instr.write('PHASe:CH2 0')
-            #self.signal.get_freq(2)
-            #mesurer l'amplitude du signal en sortie du filtre - CH2 
-           
-            # BREAK(PKKKK?????)
             time.sleep(30/f + 1)
             
-            #Gain de la Fonction de transfert = module de rapport des amplitudes
-            #amp_sortie  = self.oscillo.get_ampl(2)
-            #1er méthode mesure le gain à l'aide de l'oscilloscope
-            #gain = abs(amp/amp_sortie)
+            amp_sortie  = self.oscillo.get_ampl(2)
+            gain = abs(amp/amp_sortie)
+            print amp_sortie
             
-            # la position du max de B(w) signal de sortie / theorie de TiTus 
-            #position = int(f*0.12*self.oscillo.get_timebase())
-            #2eme methode pour déterminer la position de la pic en utilisant le signal d'entrée qui a une pic a la mêm freq que le signal du sortie qui est plus bruité,
-            #la fonction argmax donne la position du max dans la liste, on commence à 1 pour enlever le pic a la position 0 et on termine à 600 - 10 pour eviter d'avoir des pics de HF
-            curve_A = self.oscillo.get_curve(1)
-            curve_B = self.oscillo.get_curve(2)
-            position = np.argmax(abs(np.fft.fft(curve_A)[1:-10])) + 1 
-            #print position
-         
-            #Liste la FT de sortie entrée 
-            B_w = np.fft.fft(curve_B)
-            A_w = np.fft.fft(curve_A)
-            
-        
-            #phase = (np.pi/180)*np.angle((B_w[position]/A_w[position]),'deg')
-        
-            #print('phase= ',phase)
-            #liste_phase.append(phase)
-            #deuxieme methode pour le gain
-            gain=abs((B_w[position]/A_w[position]))
-            #print gain
-            #print gain
-            liste_gain.append(gain)
-            liste_A.append(A_w[position])
-            liste_B.append(B_w[position])
-            
-            
-            phase = np.arctan(imag(B_w[position])/real(B_w[position])) - np.arctan(((imag(A_w[position]))/real(A_w[position])))
-            print phase            
+            curve_a = self.oscillo.get_curve(1)
+            curve_b = self.oscillo.get_curve(2)
+            position = np.argmax(abs(np.fft.fft(curve_a)[1:-10])) + 1 
+            B_w= np.fft.fft(curve_b)
+            A_w = np.fft.fft(curve_a)
+            #gain=abs((B_w[position]/A_w[position]))
+            phase = (180/np.pi)*np.arctan(B_w[position]/A_w[position])
             liste_phase.append(phase)
+            print phase
+            liste_gain.append(gain)
+            
             
         figure("Diagramme de Bode ")
         #self.liste_A = liste_A  
@@ -295,63 +251,17 @@ class Transfert(object):
         ylabel('Amplitude')
         #grid(True, which='both')
         subplot(2,1,2)
-        semilogx(liste_freq, np.unwrap(liste_phase, np.pi))
-        #*1/(2*np.pi)*360)
+        semilogx(liste_freq, liste_phase)
         ylabel(u'Phase [°]')
         xlabel(u'frequence $\omega/2 \pi$ en [Hz]')
-        #grid(True, which='both')       
-        
-
-
-
-
-
-       
-             
-             
-# Utilisation
+        #grid(True, which='both')              
+      
+            
+            
+            
 oscillo = RigolDS1052E('USB0::0x1AB1::0x0588::DS1ED122206267::INSTR')
 signal = Generator('USB0::0x1AB1::0x0588::DG1D120300068::INSTR')
-essaye= Transfert()
-essaye.dephasage_gain(6)
-#oscillo.set_vert_scale(1,2)                     
-#scillo.get_vert_scale(1)
-#oscillo.set_timebase(0.001)
-#oscillo.get_timebase()
-#oscillo.reset()
-#oscillo.plot_curve(2)
-#oscillo.get_freq(1)
-#oscillo.get_voffset(1)
-#oscillo.get_curve(1)
+transf = Transfert()
+transf.dephasage_gain(6)
 
-#%%
-
-# pour executer dans la console ipython n'oubliez pas %pylab qt
-
-from pyqtgraph.Qt import QtGui, QtCore
-import numpy as np
-import pyqtgraph as pg
-
-#QtGui.QApplication.setGraphicsSystem('raster')
-app = QtGui.QApplication([])
-#mw = QtGui.QMainWindow()
-#mw.resize(800,800)
-
-win = pg.GraphicsWindow(title="Basic plotting examples")
-win.resize(1000,600)
-win.setWindowTitle('pyqtgraph example: Plotting')
-
-# Enable antialiasing for prettier plots
-pg.setConfigOptions(antialias=True)
-
-p1 = win.addPlot(title="Basic array plotting")
-curve = p1.plot([], [])
-curve.setData([4,7,8], [3,7,4])
-
-
-
-
-
-
-
-             
+        

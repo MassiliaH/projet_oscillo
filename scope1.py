@@ -23,6 +23,7 @@ class RigolDS1052E(object):
         # Affichage du numéro d'identification
         print(self.get_idn())
         
+        
     def get_idn(self):
         # Retourne le numéro d'identification de l'instrument
         return self.instr.ask("*IDN?")
@@ -52,18 +53,18 @@ class RigolDS1052E(object):
         # Définit la base de temps de la voie  'channel' en 'value'
         self.instr.write(':TIMebase:SCALe ' + str(value))
         
-    def get_curve(self,channel):
+    def get_curve(self):
         #Renvoie la courbe de la voie courante
-        self.instr.write(':WAVeform:DATA? ' + 'CHANnel' + str(channel))
+        self.instr.write(':WAVeform:DATA? ')
         #val contient des bytes
         val = self.instr.read_raw()
         
         #Transformer les bytes en Short et les places dans un tableau
-        return np.array([b for b in val[10:]])
+        return np.array([ord(b) for b in val[10:]])
         
         
-    def plot_curve(self, channel):
-        data = self.get_curve(channel)
+    def plot_curve(self):
+        data = self.get_curve()
         plot(data)
 
         
@@ -113,7 +114,8 @@ oscillo = RigolDS1052E('USB0::0x1AB1::0x0588::DS1ED122206267::INSTR')
 #oscillo.set_timebase(1,0.001)
 #oscillo.get_timebase()
 #oscillo.reset()
-#oscillo.get_curve(1)
+oscillo.get_curve()
 #oscillo.get_freq(1)
 #oscillo.get_voffset(1)
+oscillo.plot_curve()
 
