@@ -84,23 +84,30 @@ class RigolDS1052E(object):
  
     def get_ampl(self,channel):
         if str(channel)=='1':
-            vpp=self.ask_for_value(':MEASure:VAMPlitude? CHANnel1')
-            return vpp/2        
+            vpp=self.instr.ask(':MEAS:VAMP? CHAN1')
+            return float(vpp)/2     
         elif str(channel)=='2':
-            vpp=self.ask_for_value(':MEASure:VAMPlitude? CHANnel2')
-            return vpp/2
+            vpp=self.instr.ask(':MEAS:VAMP? CHAN2')
+            return float(vpp)/2
            
         else:
             print('check your Channel')
             
+    def rescale(self):
+        self.instr.write(':CHAN2' + ':SCALe 2')
+        time.sleep(1)
+        V_ampl = self.instr.ask(':MEAS:VPP? CHAN2')
+        #if V_ampl > 80 :
+        self.instr.write(':CHAN2' + ':SCALe ' + str(float(V_ampl)/4))
+            
     def get_volt(self,channel):
-        print ("Vmax =", self.ask_for_value(':MEASure:VMAX?'+' '+':CHAN' + str(channel)))
-        print ("Vmin =", self.ask_for_value(':MEASure:VMIN?'+' '+':CHAN' + str(channel)))
-        print ("Vpp =" , self.ask_for_value(':MEASure:VPP?'+' ' + ':CHAN' + str(channel)))
-        print ("Vtop =", self.ask_for_value(':MEASure:VTOP?'+' ' + ':CHAN' + str(channel)))
-        print ("Vrms =", self.ask_for_value(':MEASure:VRMS?'+' '+ ':CHAN' + str(channel)))
-        print ("Vbas =", self.ask_for_value(':MEASure:VBASe?'+' '+ ':CHAN' + str(channel)))
-        print ("Vmoy =", self.ask_for_value(':MEASure:VAVerage?'+' '+ ':CHAN' + str(channel)))
+        print ("Vmax =", self.instr.ask_for_value(':MEASure:VMAX?'+':CHAN' + str(channel)))
+        print ("Vmin =", self.instr.ask_for_value(':MEASure:VMIN?'+' '+':CHAN' + str(channel)))
+        print ("Vpp =" , self.instr.ask_for_value(':MEASure:VPP?'+' ' + ':CHAN' + str(channel)))
+        print ("Vtop =", self.instr.ask_for_value(':MEASure:VTOP?'+' ' + ':CHAN' + str(channel)))
+        print ("Vrms =", self.instr.ask_for_value(':MEASure:VRMS?'+' '+ ':CHAN' + str(channel)))
+        print ("Vbas =", self.instr.ask_for_value(':MEASure:VBASe?'+' '+ ':CHAN' + str(channel)))
+        print ("Vmoy =", self.instr.ask_for_value(':MEASure:VAVerage?'+' '+ ':CHAN' + str(channel)))
 
         
 
@@ -216,37 +223,45 @@ class Transfert(object):
     def __init__(self):
         self.signal = Generator('USB0::0x1AB1::0x0588::DG1D120300068::INSTR')
         self.oscillo = RigolDS1052E('USB0::0x1AB1::0x0588::DS1ED122206267::INSTR')
+
+       
         
     def dephasage_gain(self,amp):
         liste_phase = []
         liste_gain = []
         liste_A = []
         liste_B = []
-        liste_freq = [10**i for i in np.linspace(2,6,20)]     
-        self.signal.set_sinus(1,10,amp,0)
-        time.sleep(0.2)
+        liste_freq = [10**i for i in np.linspace(1.5,6,20)]     
+        #self.signal.set_sinus(1,10,amp,0)
+        #time.sleep(0.2)
         
             
         
         for f in liste_freq:
+            #initialise l echelle verticale de CH2 a 2mV
+            #self.oscillo.set_vert_scale(2,0.002)
             #print(f)
             # signal de Ref signal d'entrée A(t) / Ch 1
             self.signal.set_sinus(1,f,amp,0)
-            time.sleep(0.2)
+            time.sleep(1)
             # signal de sortie B(t) / Ch 2
             #self.signal.set_sinus(2,f,amp,0)
             #time.sleep(0.2)
             # changer la base de temps pour visualiser le signal àl'ecran
             #l'avantage c'est pouvoir acquérir plus de data sur N oscillations
-            self.oscillo.set_timebase(1/f)
+            self.oscillo.set_timebase(1/(f))
             #Set the initial phase = 0°
-            self.signal.instr.write('PHASe 0')
+            time.sleep(1)
+            #self.signal.instr.write('PHASe 0')
             #self.signal.instr.write('PHASe:CH2 0')
             #self.signal.get_freq(2)
             #mesurer l'amplitude du signal en sortie du filtre - CH2 
+            self.oscillo.rescale()
            
-            # BREAK(PKKKK?????)
-            time.sleep(30/f + 1)
+
+    #instr.write(':CHAN2:OFFS 0') 
+            # BREAK(PKKK?????)
+            time.sleep(1)
             
             #Gain de la Fonction de transfert = module de rapport des amplitudes
             #amp_sortie  = self.oscillo.get_ampl(2)
@@ -274,16 +289,18 @@ class Transfert(object):
             #deuxieme methode pour le gain
             gain=abs((B_w[position]/A_w[position]))
             #print gain
-            #print gain
+              #print gain
             liste_gain.append(gain)
             liste_A.append(A_w[position])
             liste_B.append(B_w[position])
             
             
             phase = np.arctan(imag(B_w[position])/real(B_w[position])) - np.arctan(((imag(A_w[position]))/real(A_w[position])))
-            print phase            
+            #if phase < 0:
+            phase = abs(phase)
             liste_phase.append(phase)
-            
+            time.sleep(0.2)
+        print liste_phase            
         figure("Diagramme de Bode ")
         #self.liste_A = liste_A  
         #self.liste_B = liste_B
@@ -297,7 +314,7 @@ class Transfert(object):
         subplot(2,1,2)
         semilogx(liste_freq, np.unwrap(liste_phase, np.pi))
         #*1/(2*np.pi)*360)
-        ylabel(u'Phase [°]')
+        ylabel(u'Phase [rad]')
         xlabel(u'frequence $\omega/2 \pi$ en [Hz]')
         #grid(True, which='both')       
         
@@ -313,7 +330,7 @@ class Transfert(object):
 oscillo = RigolDS1052E('USB0::0x1AB1::0x0588::DS1ED122206267::INSTR')
 signal = Generator('USB0::0x1AB1::0x0588::DG1D120300068::INSTR')
 essaye= Transfert()
-essaye.dephasage_gain(6)
+essaye.dephasage_gain(5)
 #oscillo.set_vert_scale(1,2)                     
 #scillo.get_vert_scale(1)
 #oscillo.set_timebase(0.001)
