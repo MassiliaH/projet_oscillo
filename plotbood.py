@@ -46,7 +46,7 @@ class RigolDS1052E(object):
         
     def get_vert_scale(self, channel):
         # Retourne l'échelle vertical de la voie 'channel' 
-        print (self.ask_for_value(':CHAN' + str(channel) + ':SCAle?'))
+        return self.ask_for_value(':CHAN' + str(channel) + ':SCAle?')
         
     def set_vert_scale(self, channel, value):
         # Change l'échelle verticale de la voie 'channel' en 'value'
@@ -94,10 +94,15 @@ class RigolDS1052E(object):
             print('check your Channel')
             
     def rescale(self):
+        """
+            Redéfinit l'echelle verticale de sorte à avoir un signal de sortie non saturé 
+        """
+        #change l'échelle verticale du signal de sortie a 2V
         self.instr.write(':CHAN2' + ':SCALe 2')
         time.sleep(1)
+        #après 1s on mesure l'amplitude du signal pour la stocker dans V_ampl        
         V_ampl = self.instr.ask(':MEAS:VPP? CHAN2')
-        #if V_ampl > 80 :
+        #redéfinit l'echelle verticale de façon à ce que le signal de sortie ne sorte pas du quadran
         self.instr.write(':CHAN2' + ':SCALe ' + str(float(V_ampl)/4))
             
     def get_volt(self,channel):
@@ -109,8 +114,12 @@ class RigolDS1052E(object):
         print ("Vbas =", self.instr.ask_for_value(':MEASure:VBASe?'+' '+ ':CHAN' + str(channel)))
         print ("Vmoy =", self.instr.ask_for_value(':MEASure:VAVerage?'+' '+ ':CHAN' + str(channel)))
 
-        
-
+    def get_gain(self):
+         e= self.instr.ask(':MEAS:VPP? CHAN1')
+         s= self.instr.ask(':MEAS:VPP? CHAN2')
+         g = abs(float(s)/float(e))
+         return g
+         
 class Generator(object):
     """
     class pilote of the Waveform Generator
@@ -231,19 +240,19 @@ class Transfert(object):
         liste_gain = []
         liste_A = []
         liste_B = []
-        liste_freq = [10**i for i in np.linspace(1.5,6,20)]     
+        liste_freq = [10**i for i in np.linspace(1,6,10)]     
         #self.signal.set_sinus(1,10,amp,0)
         #time.sleep(0.2)
         
-            
-        
+        self.signal.set_sinus(1,liste_freq[0],amp,0) 
+        time.sleep(1)
         for f in liste_freq:
             #initialise l echelle verticale de CH2 a 2mV
             #self.oscillo.set_vert_scale(2,0.002)
             #print(f)
             # signal de Ref signal d'entrée A(t) / Ch 1
             self.signal.set_sinus(1,f,amp,0)
-            time.sleep(1)
+            time.sleep(2 + 20/f)
             # signal de sortie B(t) / Ch 2
             #self.signal.set_sinus(2,f,amp,0)
             #time.sleep(0.2)
@@ -251,7 +260,7 @@ class Transfert(object):
             #l'avantage c'est pouvoir acquérir plus de data sur N oscillations
             self.oscillo.set_timebase(1/(f))
             #Set the initial phase = 0°
-            time.sleep(1)
+            time.sleep(2 + 20/f)
             #self.signal.instr.write('PHASe 0')
             #self.signal.instr.write('PHASe:CH2 0')
             #self.signal.get_freq(2)
@@ -261,7 +270,7 @@ class Transfert(object):
 
     #instr.write(':CHAN2:OFFS 0') 
             # BREAK(PKKK?????)
-            time.sleep(1)
+            time.sleep(2+ 20/f)
             
             #Gain de la Fonction de transfert = module de rapport des amplitudes
             #amp_sortie  = self.oscillo.get_ampl(2)
@@ -274,6 +283,11 @@ class Transfert(object):
             #la fonction argmax donne la position du max dans la liste, on commence à 1 pour enlever le pic a la position 0 et on termine à 600 - 10 pour eviter d'avoir des pics de HF
             curve_A = self.oscillo.get_curve(1)
             curve_B = self.oscillo.get_curve(2)
+            amp_A = float(max(curve_A)-min(curve_A))*self.oscillo.get_vert_scale(1)            
+            amp_B = float(max(curve_B)-min(curve_B))*self.oscillo.get_vert_scale(2)
+            gain = abs(amp_B/amp_A)
+            
+            
             position = np.argmax(abs(np.fft.fft(curve_A)[1:-10])) + 1 
             #print position
          
@@ -282,22 +296,22 @@ class Transfert(object):
             A_w = np.fft.fft(curve_A)
             
         
-            #phase = (np.pi/180)*np.angle((B_w[position]/A_w[position]),'deg')
+            phase = (np.pi/180)*np.angle((B_w[position]/A_w[position]),'deg')
+            
+            #gain = self.oscillo.get_gain()
         
-            #print('phase= ',phase)
-            #liste_phase.append(phase)
             #deuxieme methode pour le gain
-            gain=abs((B_w[position]/A_w[position]))
-            #print gain
-              #print gain
+            #gain=abs((B_w[position]/A_w[position]))
+            
+            
             liste_gain.append(gain)
             liste_A.append(A_w[position])
             liste_B.append(B_w[position])
             
             
-            phase = np.arctan(imag(B_w[position])/real(B_w[position])) - np.arctan(((imag(A_w[position]))/real(A_w[position])))
+            #phase = np.arctan(imag(B_w[position])/real(B_w[position])) - np.arctan(((imag(A_w[position]))/real(A_w[position])))
             #if phase < 0:
-            phase = abs(phase)
+            phase = -abs(phase)
             liste_phase.append(phase)
             time.sleep(0.2)
         print liste_phase            
@@ -307,16 +321,16 @@ class Transfert(object):
         #clf()
         subplot(2,1,1)
         title('Diagramme de Bode')#($\omega_c$={0} Hz , Gain_0={1})'.format(omega_c,gain))
-        #grid(True, which='both')
+        grid(True, which='both')
         loglog(liste_freq, liste_gain)
         ylabel('Amplitude')
-        #grid(True, which='both')
+        grid(True, which='both')
         subplot(2,1,2)
         semilogx(liste_freq, np.unwrap(liste_phase, np.pi))
         #*1/(2*np.pi)*360)
         ylabel(u'Phase [rad]')
         xlabel(u'frequence $\omega/2 \pi$ en [Hz]')
-        #grid(True, which='both')       
+        grid(True, which='both')       
         
 
 
@@ -330,7 +344,7 @@ class Transfert(object):
 oscillo = RigolDS1052E('USB0::0x1AB1::0x0588::DS1ED122206267::INSTR')
 signal = Generator('USB0::0x1AB1::0x0588::DG1D120300068::INSTR')
 essaye= Transfert()
-essaye.dephasage_gain(5)
+essaye.dephasage_gain(7)
 #oscillo.set_vert_scale(1,2)                     
 #scillo.get_vert_scale(1)
 #oscillo.set_timebase(0.001)
@@ -345,26 +359,26 @@ essaye.dephasage_gain(5)
 
 # pour executer dans la console ipython n'oubliez pas %pylab qt
 
-from pyqtgraph.Qt import QtGui, QtCore
-import numpy as np
-import pyqtgraph as pg
-
-#QtGui.QApplication.setGraphicsSystem('raster')
-app = QtGui.QApplication([])
-#mw = QtGui.QMainWindow()
-#mw.resize(800,800)
-
-win = pg.GraphicsWindow(title="Basic plotting examples")
-win.resize(1000,600)
-win.setWindowTitle('pyqtgraph example: Plotting')
-
-# Enable antialiasing for prettier plots
-pg.setConfigOptions(antialias=True)
-
-p1 = win.addPlot(title="Basic array plotting")
-curve = p1.plot([], [])
-curve.setData([4,7,8], [3,7,4])
-
+#from pyqtgraph.Qt import QtGui, QtCore
+#import numpy as np
+#import pyqtgraph as pg
+#
+##QtGui.QApplication.setGraphicsSystem('raster')
+#app = QtGui.QApplication([])
+##mw = QtGui.QMainWindow()
+##mw.resize(800,800)
+#
+#win = pg.GraphicsWindow(title="Basic plotting examples")
+#win.resize(1000,600)
+#win.setWindowTitle('pyqtgraph example: Plotting')
+#
+## Enable antialiasing for prettier plots
+#pg.setConfigOptions(antialias=True)
+#
+#p1 = win.addPlot(title="Basic array plotting")
+#curve = p1.plot([], [])
+#curve.setData([4,7,8], [3,7,4])
+#
 
 
 
